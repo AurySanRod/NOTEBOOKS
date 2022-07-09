@@ -1,0 +1,201 @@
+Importacion de librerias
+# Importar librerias
+import numpy as np
+import pandas as pd
+
+# Importar Visualización
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+%matplotlib inline
+Lectura de archivo CSV
+#Se lee el archivo que se encuentra almacenado en la carpeta ColabNotebooks de mi disco en Drive.
+df = pd.read_csv('/content/drive/MyDrive/ColabNotebooks/OnlineRetail.csv')
+
+Análisis Exploratorio
+#Se pretende conocer el numero de Filas que componen el DataSet para tener una idea de la cantidad de datos con los que se estan trabajando.
+print('Número de Filas del DataSet:')
+df.shape[0]
+
+#Se busca conocer el numero de columnas con las que se conforma el DataSet, para conocer un poco del contexto que conforma la información.
+print('Número de Columnas del DataSet:')
+df.shape[1]
+
+
+#Parte de conocer el DataSet es saber si contamos con infotmacion completa, saber los tipos de datos que estamos trabajando,
+#si existen o no registros de información que se encuentren vacios, o bien, si existe algun dato almacenado que desconocemos como parte del negocio 
+print('Información general del DataSet: \n')
+df.info()
+
+
+#Buscamos conocer si alguna columna cuenta con valores nulos o perdidos, para saber como podemos manipularlos
+print('¿Existen valores nulos de cada Columna? \n\n Columna          Valor \n')
+df.isna().any()
+
+
+#Buscamos la cantidad de estos valores nulos, para conocer la cantidad de datos que se van a eliminar.
+print('Valores nulos de cada Columna: \n\n Columna          Valor \n')
+df.isna().sum()
+
+
+#Se eliminan los valores nulos de cada columna.
+print('Eliminar los datos Nulos o Perdidos de Cada columna')
+df = df.dropna()
+
+
+#Se consulta nuevamente si hay columnas con valores nulos, para verificar que se haya hecho la eliminacion de manera correcta.
+print('Valores Nulos de Cada Columna:  \n Columna       Valores Nulos ')
+df.isna().any()
+
+
+#Se realiza una consulta para conocer el estado actual del DataSet, revisar si existe algún dato ilógico
+print('Resumen actual del DataSet')
+df.describe()
+
+
+#Se pudo observar que el DataSet cuenta con valores negativos para la cantidad de visitantes que acceden al lugar al que se esta analizando, por lo que se le 
+#indica al DataSet que ignore para la columna Cantidad (Quantity) los valores que son menores a Cero, definiendo a si misma como los valores del DataSet de la
+#columna Quantity iguales o mayores a 0.
+print('Eliminar datos ilógicos')
+df = df[df.Quantity>=0]
+
+#Se realiza una consulta para conocer el estado actual del DataSet, revisar si se consideraron los datos de manera correcta.
+#A su vez, se pretende conocer los Valores:
+#*Maximo, Minimo, Media y Desviación estandar de cada columna con dicha funcion, esto unicamente para las columnas de Valores Numéricos.
+print('Mostrar estado actual del DataSet Manipulado')
+df.describe()
+
+
+
+
+
+#Buscamos conocer cuales son los valores unicos de Cada una de las columnas que nos brindan informacion del DataSet:
+print('Cantidad de valores únicos para la columna: \nColumna          Valor')
+print('Quantity:        ' + str(len(df['Quantity'].unique())))
+print('InvoiceNo:       ' + str(len(df['InvoiceNo'].unique())))
+print('StockCode:       ' + str(len(df['StockCode'].unique())))
+print('Description:     ' + str(len(df['Description'].unique())))
+print('InvoiceDate:     ' + str(len(df['InvoiceDate'].unique())))
+print('UnitPrice:       ' + str(len(df['UnitPrice'].unique())))
+print('CustomerID:      ' + str(len(df['CustomerID'].unique())))
+print('Country:         ' + str(len(df['Country'].unique())))
+
+
+
+
+**Una vez teniendo los datos de manera adecuada, limpia, se puede empezar a trabajar sobre ellos, por lo tanto comenzaremos a realizar operaciones con ellos de una manera más descriptiva.**
+*Calcular el RFM - Recency (Reciente), Frequency (Frecuencia) y Monetary value (Valor monetario)*
+
+
+#Realizar conversión de InvoiceDate de object a date para poder manipular el dato como una fecha
+#Importamos la libreria de Fechas, para poder realizar la conversión 
+import datetime as date_visit_recency
+df.loc[:,['InvoiceDate']]=pd.to_datetime(df['InvoiceDate'])
+
+#Realizamos la busqueda de la fecha más reciente del DataFrame en la columna InvoiceDate
+print('La fecha de visita más reciente fue el:')
+recientVisit= str(df['InvoiceDate'].max())
+print(recientVisit)
+#Calculamos reciente para cada Cliente (CustomerID).
+
+#Agrupamos los valores del DataFrame por el ID del Cliente, con su valor maximo para la fecha de generación de la Factura.
+df_recency=df.groupby(by='CustomerID', as_index=False)['InvoiceDate'].max()
+
+#Creamos las columnas que se requieren para almacenar el dato del Cliente y de la fecha más reciente.
+df_recency.columns = ['CustomerID','VisitDate']
+
+#Asignamos el Valor de la fecha más actual a la variable de Fecha de visita.
+date_visit_recency=df_recency['VisitDate'].max()
+
+#Calculamos la cantidad de veces que el Cliente ha accedido a una misma sección y generado factura del mismo.
+df_recency['Recency'] = df_recency['VisitDate'].apply( lambda x: (date_visit_recency - x ).days)
+
+#Mostramos los datos en la tabla.
+df_recency.head(10)
+#Calcularemos la Frecuencia con que un cliente ha realizado una facturación.
+
+#asignamos al dataFrame de Frecuencia el valor agrupado por unico Cliente las fechas que ha facturado.
+df_Frequency = df.drop_duplicates().groupby(by='CustomerID', as_index=False)['InvoiceDate'].count()
+
+#Creamos una colimna para el Cliente y otra para la Frecuencia.
+df_Frequency.columns =['CustomerID','Frequency']
+
+#Mostramos los datos en la tabla.
+df_Frequency.head(10)
+#Calculemos el valor monetario de cada Cliente
+
+#Se calcula en el DataFrame para la columna Total el resultado de multiplicar el Precio por la cantidad
+df['Total'] = df['UnitPrice']*df['Quantity']
+
+#Agrupamos en valor monetario por Cliente la suma del valor monetario
+df_monetary = df.groupby(by='CustomerID',as_index=False)['Total'].sum()
+
+#Se crean las columnas para el DataFrame
+df_monetary.columns = ['CustomerID','Monetary']
+
+#Mostramos los datos resultantes
+df_monetary.head()
+#Resumen de RFM
+#Creamos un nuevo DataFrame para almacenar todos los datos del análsis RFM
+df_RFM=pd.DataFrame()
+
+#Creamos las columnas para el DataFrame
+df_RFM['CustomerID'] = None
+df_RFM['Recency'] = None
+df_RFM['Frequency'] = None
+df_RFM['Monetary'] = None
+
+
+#Asignamos los valores a cada columna del DataFrame RFM a partir de los valores calculados
+df_RFM['CustomerID']=df_recency['CustomerID']
+df_RFM['Recency']=df_recency['Recency']
+df_RFM['Frequency']=df_Frequency['Frequency']
+df_RFM['Monetary']=df_monetary['Monetary']
+
+#Mostramos el resultado de la tabla.
+df_RFM.head(10)
+#Buscamos los Cuantiles de muestra para generar la segmentación del contenido.
+
+#Definimos los límites de nuestros cuantiles.
+quantiles = df_RFM.quantile(q=[0.20,0.40,0.60,0.80]) 
+
+#Creamos un diccionario con los valores obtenidos. 
+quantiles = quantiles.to_dict() 
+#Preparamos un nuevo DataFrame para estos segmentos
+segmented_rfm=df_RFM
+#Creamos una función para asignarle un valor, score, a los valores de Recientes, mientras menor sea el valor, es decir más reciente, mejor
+def RScore(x,p,d): 
+  #Creamos los rangos
+    if x <= d[p][0.20]:
+        return 1 
+    elif x <= d[p][0.40]:
+        return 2 
+    elif x <= d[p][0.60]: 
+        return 3 
+    elif x <= d[p][0.80]: 
+        return 4 
+    else:
+        return 5
+    
+#Repetimos proceso pero para Frecuencia y valor monetario, en este caso mientras mayor sea la frecuencia, mejor. 
+def FMScore(x,p,d): 
+  #Generamos los rangos
+    if x <= d[p][0.20]:
+        return 5 
+    elif x <= d[p][0.40]:
+        return 4
+    elif x <= d[p][0.60]: 
+        return 3
+    elif x <= d[p][0.80]: 
+        return 2
+    else:
+        return 1
+#Aplicamos la función Rscore para obtenr el Score para la columna Recency del DataFrame df_RFM
+df_RFM['r_quartile'] = df_RFM['Recency'].apply(RScore, args=('Recency',quantiles,)) 
+
+#Aplicamos la función FMscore para obtenr el Score para la columna Frequency y Monetary del DataFrame df_RFM
+segmented_rfm['f_quartile'] = segmented_rfm['Frequency'].apply(FMScore, args=('Frequency',quantiles,))
+segmented_rfm['m_quartile'] = segmented_rfm['Monetary'].apply(FMScore, args=('Monetary',quantiles,)) 
+
+#Obtenemos los valores de la tabla df_RFM con los valores RFM calculados así como  sus respectivos Scores
+segmented_rfm.head(10) 
